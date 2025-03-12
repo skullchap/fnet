@@ -269,6 +269,10 @@ sockdial(NetConn *c)
 		setfneterr("socket creation failed (%s)", errnostr());
 		return -1;
 	}
+	if(c->socktype == DgRam){
+		int b=1;
+		setsockopt(fd, SOL_SOCKET, SO_BROADCAST, &b, sizeof(b));
+	}
 
 	switch(c->sockdomain)
 	{
