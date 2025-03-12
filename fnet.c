@@ -361,7 +361,7 @@ socklisten(NetConn *c)
 	case Unix:
 		memset(&addrUnix, 0, sizeof(addrUnix));
 		addrUnix.sun_family = AF_UNIX;
-		strncpy(addrUnix.sun_path, c->remote.addr, sizeof(addrUnix.sun_path) - 1);
+		strncpy(addrUnix.sun_path, c->local.addr, sizeof(addrUnix.sun_path) - 1);
 		paddr = &addrUnix;
 		addrlen = sizeof(addrUnix);
 		break;
