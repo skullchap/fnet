@@ -1,10 +1,20 @@
 /* started 2025.03.08 - MIT - https://github.com/skullchap/fnet */
 
-#include "defs.h"
+#define nil 		((void*)0)
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 #include "fnet.h"
 
+typedef unsigned char	uchar;
+typedef unsigned short	ushort;
+typedef unsigned int	uint;
+typedef unsigned long	ulong;
+
 typedef struct	NetAddr NetAddr;
-typedef struct 	ParsedV4V6 ParsedV4V6;
+typedef struct	ParsedV4V6 ParsedV4V6;
 typedef enum	ConnType ConnType;
 typedef enum	SockDomain SockDomain;
 typedef enum	SockType SockType;
@@ -58,34 +68,34 @@ struct NetConn
 	int fd;
 };
 
-static NetConn*	newnetconn(char *proto, char* addr, ConnType ct);
+static NetConn*	newnetconn(char *proto, char *addr, ConnType ct);
 static int	setsockdomaintype(NetConn *c, char *proto, char *addr);
 static int	sockdial(NetConn *c);
 static int	socklisten(NetConn *c);
 static int	sockaccept(NetConn *c);
 static int	setlocaddr(NetConn *c);
 static int	setremaddr(NetConn *c);
-static FILE*	fdfile(int fd);
+static FILE*	fdfile(int sock);
 static int	parsev4v6(char *addr, ParsedV4V6 *result);
 static int	setfneterr(char *fmt, ...);
-static char*	errnostr(void);
+static char*	errnostr();
 
 static
 int
 setsockdomaintype(NetConn *c, char *proto, char *addr)
 {
-	int r, v4v6= 0;
+	int v4v6= 0;
 	ParsedV4V6 paddr;
 
 	if(strncmp("tcp", proto, ProtoStrMaxLen) == 0){
-		v4v6=1;
-		c->socktype= Stream;
+		v4v6 = 1;
+		c->socktype = Stream;
 	}else if(strncmp("udp", proto, ProtoStrMaxLen) == 0){
-		v4v6=1;
-		c->socktype= DgRam;
+		v4v6 = 1;
+		c->socktype = DgRam;
 	}else if(strncmp("unix", proto, ProtoStrMaxLen) == 0){
-		c->sockdomain=	Unix;
-		c->socktype=	Stream;
+		c->sockdomain = Unix;
+		c->socktype = Stream;
 	}else{
 		setfneterr("unknown proto (%s)", proto);
 		return -1;
@@ -104,16 +114,14 @@ setsockdomaintype(NetConn *c, char *proto, char *addr)
 
 static
 NetConn*
-newnetconn(char *proto, char* addr, ConnType ct)
+newnetconn(char *proto, char *addr, ConnType ct)
 {
 	NetConn *c;
-	int fd;
-	FILE *f;
 
 	c = calloc(1, sizeof(NetConn));
 	if(!c)
 		return nil;
-	
+
 	c->conntype = ct;
 	if(setsockdomaintype(c, proto, addr) < 0){
 		free(c);
@@ -142,13 +150,14 @@ dialisten(NetConn *c)
 		}
 	}
 	if(!(c->f = fdfile(c->fd))){
+		close(c->fd);
 		return -1;
 	}
-	return 0;	
+	return 0;
 }
 
-NetConn *
-fnetdial(char *proto, char* addr)
+NetConn*
+fnetdial(char *proto, char *addr)
 {
 	NetConn *c = newnetconn(proto, addr, Dial);
 	if(!c)
@@ -160,8 +169,8 @@ fnetdial(char *proto, char* addr)
 	return c;
 }
 
-NetConn *
-fnetlisten(char *proto, char* addr)
+NetConn*
+fnetlisten(char *proto, char *addr)
 {
 	NetConn *c = newnetconn(proto, addr, Listen);
 	if(!c)
@@ -173,10 +182,10 @@ fnetlisten(char *proto, char* addr)
 	return c;
 }
 
-NetConn *
+NetConn*
 fnetaccept(NetConn *servc)
 {
-	NetConn	*clientc;
+	NetConn *clientc;
 
 	if(servc->socktype == DgRam){
 		setfneterr("fnetaccept should be applied on stream sockets");
@@ -186,7 +195,7 @@ fnetaccept(NetConn *servc)
 	clientc = newnetconn(servc->local.proto, servc->local.addr, Listen);
 	if(!clientc)
 		return nil;
-		
+
 	if((clientc->fd = sockaccept(servc)) < 0){
 		fnetclose(clientc);
 		return nil;
@@ -199,8 +208,8 @@ fnetaccept(NetConn *servc)
 	return clientc;
 }
 
-FILE*	fnetf(NetConn *c)	{return c->f;}
-void	fnetclose(NetConn *c)	{if(c->f)fclose(c->f); free(c);}
+FILE* 	fnetf(NetConn *c)		{return c->f;}
+void	fnetclose(NetConn *c)		{if(c->f)fclose(c->f); free(c);}
 
 char*
 fnetlocaddr(NetConn *c)
@@ -213,11 +222,12 @@ fnetlocaddr(NetConn *c)
 char*
 fnetremaddr(NetConn *c)
 {
-	if(c->conntype == Listen && 
+	if(c->conntype == Listen &&
 	(c->socktype == DgRam || c->remote.addr[0] == '\0'))
 		setremaddr(c);
 	return c->remote.addr;
 }
+
 
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -227,8 +237,7 @@ fnetremaddr(NetConn *c)
 typedef struct sockaddr_in 	SockaddrIn;
 typedef struct sockaddr_in6 	SockaddrIn6;
 typedef struct sockaddr_un 	SockaddrUnix;
-typedef struct sockaddr 	Sockaddr;
-typedef struct sockaddr_storage	SockaddrStorage;
+typedef struct sockaddr		Sockaddr;
 
 static
 int
@@ -241,14 +250,14 @@ sockdial(NetConn *c)
 	uchar domain, type;
 	void *paddr; uint addrlen;
 
-	switch (c->sockdomain)
+	switch(c->sockdomain)
 	{
 	case Unix: domain = AF_UNIX; break;
 	case IPv4: domain = AF_INET; break;
 	case IPv6: domain = AF_INET6; break;
 	default: setfneterr("bad socket domain (%d)", c->sockdomain); return -1;
 	}
-	switch (c->socktype)
+	switch(c->socktype)
 	{
 	case Stream: type = SOCK_STREAM; break;
 	case DgRam:  type = SOCK_DGRAM; break;
@@ -261,7 +270,7 @@ sockdial(NetConn *c)
 		return -1;
 	}
 
-	switch (c->sockdomain)
+	switch(c->sockdomain)
 	{
 	case IPv4:
 		memset(&addrV4, 0, sizeof(addrV4));
@@ -281,8 +290,8 @@ sockdial(NetConn *c)
 		break;
 	case Unix:
 		memset(&addrUnix, 0, sizeof(addrUnix));
-    		addrUnix.sun_family = AF_UNIX;
-    		strncpy(addrUnix.sun_path, c->remote.addr, sizeof(addrUnix.sun_path)-1);
+		addrUnix.sun_family = AF_UNIX;
+		strncpy(addrUnix.sun_path, c->remote.addr, sizeof(addrUnix.sun_path) - 1);
 		paddr = &addrUnix;
 		addrlen = sizeof(addrUnix);
 		break;
@@ -311,14 +320,14 @@ socklisten(NetConn *c)
 	uchar domain, type;
 	void *paddr; uint addrlen;
 
-	switch (c->sockdomain)
+	switch(c->sockdomain)
 	{
 	case Unix: domain = AF_UNIX; break;
 	case IPv4: domain = AF_INET; break;
 	case IPv6: domain = AF_INET6; break;
 	default: setfneterr("bad socket domain (%d)", c->sockdomain); return -1;
 	}
-	switch (c->socktype)
+	switch(c->socktype)
 	{
 	case Stream: type = SOCK_STREAM; break;
 	case DgRam:  type = SOCK_DGRAM; break;
@@ -331,7 +340,7 @@ socklisten(NetConn *c)
 		return -1;
 	}
 
-	switch (c->sockdomain)
+	switch(c->sockdomain)
 	{
 	case IPv4:
 		memset(&addrV4, 0, sizeof(addrV4));
@@ -351,8 +360,8 @@ socklisten(NetConn *c)
 		break;
 	case Unix:
 		memset(&addrUnix, 0, sizeof(addrUnix));
-    		addrUnix.sun_family = AF_UNIX;
-    		strncpy(addrUnix.sun_path, c->remote.addr, sizeof(addrUnix.sun_path)-1);
+		addrUnix.sun_family = AF_UNIX;
+		strncpy(addrUnix.sun_path, c->remote.addr, sizeof(addrUnix.sun_path) - 1);
 		paddr = &addrUnix;
 		addrlen = sizeof(addrUnix);
 		break;
@@ -398,7 +407,7 @@ setlocaddr(NetConn *c)
 	void *paddr; uint addrlen;
 	char buf[AddrStrMaxLen];
 
-	switch (c->sockdomain)
+	switch(c->sockdomain)
 	{
 	case IPv4:
 		paddr = &addrV4;
@@ -446,7 +455,7 @@ setremaddr(NetConn *c)
 	void *paddr; uint addrlen;
 	char buf[AddrStrMaxLen];
 
-	switch (c->sockdomain)
+	switch(c->sockdomain)
 	{
 	case IPv4:
 		paddr = &addrV4;
@@ -498,14 +507,12 @@ static
 FILE*
 fdfile(int fd)
 {
-	FILE *sf;
-
-	sf = fdopen(fd, "r+");
-   	if(sf == nil){
+	FILE *f = fdopen(fd, "r+");
+	if(f == nil){
 		setfneterr("fdopen failed (%s)", errnostr());
 		return nil;
 	}
-	return sf;
+	return f;
 }
 
 static
@@ -529,7 +536,7 @@ int
 parsev4v6(char *addr, ParsedV4V6 *result)
 {
 	char ip[AddrStrMaxLen];
-	int port= 0;
+	int port = 0;
 	char *colon_pos;
 	char *port_part;
 
@@ -578,15 +585,36 @@ parsev4v6(char *addr, ParsedV4V6 *result)
 }
 
 
-
 /* error.c */
 
 #include <errno.h>
 #include <stdarg.h>
 
-static	thread_local char estr[256];
+# if __STDC_VERSION__ <= 202311L  /* in C23 thread_local is a builtin keyword */
+/* https://stackoverflow.com/a/18298965 */
+# ifndef thread_local
+# if __STDC_VERSION__ >= 201112L && !defined __STDC_NO_THREADS__
+#  define thread_local _Thread_local
+# elif defined _WIN32 && ( \
+	   defined _MSC_VER || \
+	   defined __ICL || \
+	   defined __DMC__ || \
+	   defined __BORLANDC__ )
+#  define thread_local __declspec(thread) 
+/* note that ICC (linux) and Clang are covered by __GNUC__ */
+# elif defined __GNUC__ || \
+	   defined __SUNPRO_C || \
+	   defined __xlC__
+#  define thread_local __thread
+# else
+# warning "Cannot define thread_local"
+# define thread_local
+# define no_thread_local
+# endif
+# endif
+# endif
 
-int	vsnprintf(char *, ulong, const char *, va_list);
+static	thread_local char estr[256];
 
 char*	fneterr(void)	{return estr;}
 char*	errnostr(void)	{return strerror(errno);}
