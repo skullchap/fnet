@@ -9,26 +9,33 @@ typedef unsigned short	ushort;
 typedef unsigned int	uint;
 typedef unsigned long	ulong;
 
-int	setfneterr(char *fmt, ...);
-char*	errnostr(void);
 
 /* clib */
 typedef struct FILE FILE;
+enum
+{
+        IOFBF=          0,
+        IOLBF=          1,
+        IONBF=          2,
 
+        SEEK_SET=       0,
+        SEEK_CUR=       1,
+        SEEK_END=       2,
+};
 int	printf(const char *, ...);
 int	fprintf(FILE *, const char *, ...);
 int	snprintf(char *, ulong, const char *, ...);
 int	sscanf(const char *, const char *, ...);;
 FILE*	fopen(const char *, const char *);
 int	setvbuf(FILE *, char *, int, ulong);
-ulong	fread(void *ptr, ulong size, ulong nitems, FILE*);
+ulong	fread(void *, ulong sz, ulong n, FILE*);
+ulong	fwrite(const void *, ulong sz, ulong n, FILE *);
 int	fputs(const char *, FILE* );
 int	fseek(FILE*, long off, int whence);
 long	ftell(FILE*);
 void	rewind(FILE*);
 void	fclose(FILE*);
 int	fflush(FILE *);
-void*	alloca(ulong);
 void*	malloc(ulong);
 void*	realloc(void *, ulong);
 void	free(void *);
@@ -43,8 +50,15 @@ int	strncmp(const char *, const char *, ulong);
 char*	strchr(const char *, int);
 char*	strrchr(const char *, int);
 char*	strerror(int);
-int	atoi(const char *str);
+int	atoi(const char *);
 
+
+/* posix */
+int		close(int fd);
+FILE*		fdopen(int fd, const char *mode);
+
+
+/* thread_local define */
 # if __STDC_VERSION__ <= 202311L  /* in C23 thread_local is a builtin keyword */
 /* https://stackoverflow.com/a/18298965 */
 # ifndef thread_local

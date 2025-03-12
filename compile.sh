@@ -7,13 +7,17 @@ fi
 
 if [ "$1" = "dial" ]; then
   echo "compiling dial"
-  cc fnet.c \
-  dial.c -o dial
+  cc \
+  -I ./. \
+  fnet.c \
+  examples/dial.c -o examples/dial
 
 elif [ "$1" = "listen" ]; then
   echo "compiling listen"
-  cc fnet.c \
-  listen.c -o listen
+  cc \
+  -I ./. \
+  fnet.c \
+  examples/listen.c -o exampleslisten
 
 else
   echo "Allowed args are: dial, listen"

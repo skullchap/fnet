@@ -58,9 +58,6 @@ struct NetConn
 	int fd;
 };
 
-int		close(int fd);
-FILE*		fdopen(int fd, const char *mode);
-
 static NetConn*	newnetconn(char *proto, char* addr, ConnType ct);
 static int	setsockdomaintype(NetConn *c, char *proto, char *addr);
 static int	sockdial(NetConn *c);
@@ -70,6 +67,8 @@ static int	setlocaddr(NetConn *c);
 static int	setremaddr(NetConn *c);
 static FILE*	fdfile(int fd);
 static int	parsev4v6(char *addr, ParsedV4V6 *result);
+static int	setfneterr(char *fmt, ...);
+static char*	errnostr(void);
 
 static
 int
@@ -411,7 +410,7 @@ setlocaddr(NetConn *c)
 		break;
 	case Unix:
 		strncpy(c->local.addr, c->remote.addr, AddrStrMaxLen);
-		break;
+		return 0;
 	default:
 		setfneterr("bad domain (%d)", c->sockdomain);
 		return -1;
@@ -506,7 +505,6 @@ fdfile(int fd)
 		setfneterr("fdopen failed (%s)", errnostr());
 		return nil;
 	}
-	/* setvbuf(sf, nil, IONBF, 0); */
 	return sf;
 }
 
@@ -586,7 +584,7 @@ parsev4v6(char *addr, ParsedV4V6 *result)
 #include <errno.h>
 #include <stdarg.h>
 
-static thread_local char estr[256];
+static	thread_local char estr[256];
 
 int	vsnprintf(char *, ulong, const char *, va_list);
 

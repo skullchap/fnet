@@ -15,6 +15,7 @@ main(int argc, char **argv)
 		printf("forgot to pass proto or address? (e.g. \"%s tcp 127.0.0.1:9999\")\n", argv[0]);
 		return -1;
 	}
+
 	if(strstr(argv[1], "udp")){
 		isudp = 1;
 	}
@@ -39,9 +40,11 @@ main(int argc, char **argv)
 		}else{
 			if(isudp)
 				client = serv;
-			while(fgets(buf, sizeof(buf), fnetf(client))){
+			while(1){
 				if(isudp)
 					printf("New Msg (%s <- %s)\n", fnetlocaddr(client), fnetremaddr(client));
+				if(!fgets(buf, sizeof(buf), fnetf(client)))
+					break;
 				fputs(buf, stdout);
 				fflush(stdout);
 			}
