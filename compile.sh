@@ -17,7 +17,7 @@ elif [ "$1" = "listen" ]; then
   cc \
   -I ./. \
   fnet.c \
-  examples/listen.c -o exampleslisten
+  examples/listen.c -o examples/listen
 
 else
   echo "Allowed args are: dial, listen"
