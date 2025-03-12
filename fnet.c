@@ -75,7 +75,7 @@ static int	socklisten(NetConn *c);
 static int	sockaccept(NetConn *c);
 static int	setlocaddr(NetConn *c);
 static int	setremaddr(NetConn *c);
-static FILE*	fdfile(int sock);
+static FILE*	fdfile(int fd);
 static int	parsev4v6(char *addr, ParsedV4V6 *result);
 static int	setfneterr(char *fmt, ...);
 static char*	errnostr();
