@@ -200,7 +200,7 @@ fnetaccept(NetConn *servc)
 }
 
 FILE*	fnetf(NetConn *c)	{return c->f;}
-void	fnetclose(NetConn *c)	{fclose(c->f); free(c);}
+void	fnetclose(NetConn *c)	{if(c->f)fclose(c->f); free(c);}
 
 char*
 fnetlocaddr(NetConn *c)
