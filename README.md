@@ -25,7 +25,5 @@ cd examples/
 # ./listen tcp 127.0.0.1:9999 # ./dial tcp 127.0.0.1:9999
 ```
 
-##### P.S. It would be great to have Windows support, but it seems like an impossible task due to how the operating system handles sockets and files internally. I tried, but nothing came of it. Perhaps it's still possible, though.
-
 ## License
 MIT

@@ -2,10 +2,31 @@
 
 #define nil 		((void*)0)
 
+#ifndef _WIN32
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+
+typedef int sockt;
+#else
+#define _CRT_SECURE_NO_WARNINGS
+#define _WINSOCK_DEPRECATED_NO_WARNINGS
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#include <afunix.h>
+#include <fcntl.h>
+#include <io.h>
+#pragma comment(lib, "ws2_32.lib")
+
+typedef SOCKET sockt;
+#define close closesocket
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 #include "fnet.h"
 
 typedef unsigned char	uchar;
@@ -78,6 +99,7 @@ static int	setremaddr(NetConn *c);
 static FILE*	fdfile(int fd);
 static int	parsev4v6(char *addr, ParsedV4V6 *result);
 static int	setfneterr(char *fmt, ...);
+static char*	sockerrstr();
 static char*	errnostr();
 
 static
@@ -229,11 +251,6 @@ fnetremaddr(NetConn *c)
 }
 
 
-#include <sys/socket.h>
-#include <sys/un.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-
 typedef struct sockaddr_in 	SockaddrIn;
 typedef struct sockaddr_in6 	SockaddrIn6;
 typedef struct sockaddr_un 	SockaddrUnix;
@@ -264,11 +281,19 @@ sockdial(NetConn *c)
 	default: setfneterr("bad socket type (%d)", c->socktype); return -1;
 	}
 
+#ifndef _WIN32
 	fd = socket(domain, type, 0);
 	if(fd < 0){
-		setfneterr("socket creation failed (%s)", errnostr());
+		setfneterr("socket creation failed (%s)", sockerrstr());
 		return -1;
 	}
+#else
+	fd = WSASocketA(domain, type, 0, 0, 0, 0);
+	if(fd == INVALID_SOCKET){
+		setfneterr("socket creation failed (%s)", sockerrstr());
+		return -1;
+	}
+#endif
 	if(c->socktype == DgRam){
 		int b=1;
 		setsockopt(fd, SOL_SOCKET, SO_BROADCAST, &b, sizeof(b));
@@ -307,7 +332,7 @@ sockdial(NetConn *c)
 
 	if(connect(fd, paddr, addrlen) < 0){
 		close(fd);
-		setfneterr("connection failed (%s)", errnostr());
+		setfneterr("connection failed (%s)", sockerrstr());
 		return -1;
 	}
 	return fd;
@@ -338,11 +363,19 @@ socklisten(NetConn *c)
 	default: setfneterr("bad socket type (%d)", c->socktype); return -1;
 	}
 
+#ifndef _WIN32
 	fd = socket(domain, type, 0);
 	if(fd < 0){
-		setfneterr("socket creation failed (%s)", errnostr());
+		setfneterr("socket creation failed (%s)", sockerrstr());
 		return -1;
 	}
+#else
+	fd = WSASocketA(domain, type, 0, 0, 0, 0);
+	if(fd == INVALID_SOCKET){
+		setfneterr("socket creation failed (%s)", sockerrstr());
+		return -1;
+	}
+#endif
 
 	switch(c->sockdomain)
 	{
@@ -377,14 +410,14 @@ socklisten(NetConn *c)
 
 	if(bind(fd, paddr, addrlen) < 0){
 		close(fd);
-		setfneterr("bind failed (%s)", errnostr());
+		setfneterr("bind failed (%s)", sockerrstr());
 		return -1;
 	}
 
 	if(c->socktype == Stream){
 		if(listen(fd, 128) < 0){
 			close(fd);
-			setfneterr("listen failed (%s)", errnostr());
+			setfneterr("listen failed (%s)", sockerrstr());
 			return -1;
 		}
 	}
@@ -396,7 +429,7 @@ sockaccept(NetConn *c)
 {
 	int cfd = accept(c->fd, nil, nil);
 	if(cfd < 0){
-		setfneterr("accept failed (%s)", errnostr());
+		setfneterr("accept failed (%s)", sockerrstr());
 		return -1;
 	}
 	return cfd;
@@ -430,19 +463,19 @@ setlocaddr(NetConn *c)
 	}
 
 	if(getsockname(c->fd, paddr, &addrlen) < 0){
-		setfneterr("getsockname failed (%s)", errnostr());
+		setfneterr("getsockname failed (%s)", sockerrstr());
 		return -1;
 	}
 	if(c->sockdomain == IPv4){
 		if(inet_ntop(AF_INET, &addrV4.sin_addr, buf, sizeof(buf)) == nil){
-			setfneterr("inet_ntop failed (%s)", errnostr());
+			setfneterr("inet_ntop failed (%s)", sockerrstr());
 			return -1;
 		}
 		snprintf(c->local.addr, AddrStrMaxLen, "%s:%d", buf, ntohs(addrV4.sin_port));
 	}
 	if(c->sockdomain == IPv6){
 		if(inet_ntop(AF_INET6, &addrV6.sin6_addr, buf, sizeof(buf)) == nil){
-			setfneterr("inet_ntop failed (%s)", errnostr());
+			setfneterr("inet_ntop failed (%s)", sockerrstr());
 			return -1;
 		}
 		snprintf(c->local.addr, AddrStrMaxLen, "%s:%d", buf, ntohs(addrV6.sin6_port));
@@ -479,27 +512,27 @@ setremaddr(NetConn *c)
 
 	if(c->socktype == Stream){
 		if(getpeername(c->fd, paddr, &addrlen) < 0){
-			setfneterr("getpeername failed (%s)", errnostr());
+			setfneterr("getpeername failed (%s)", sockerrstr());
 			return -1;
 		}
 	}else{
 		char b[1];
 		if(recvfrom(c->fd, b, 1, MSG_PEEK, paddr, &addrlen) < 0){
-			setfneterr("recvfrom failed (%s)", errnostr());
+			setfneterr("recvfrom failed (%s)", sockerrstr());
 			return -1;
 		}
 	}
 
 	if(c->sockdomain == IPv4){
 		if(inet_ntop(AF_INET, &addrV4.sin_addr, buf, sizeof(buf)) == nil){
-			setfneterr("inet_ntop failed (%s)", errnostr());
+			setfneterr("inet_ntop failed (%s)", sockerrstr());
 			return -1;
 		}
 		snprintf(c->remote.addr, AddrStrMaxLen, "%s:%d", buf, ntohs(addrV4.sin_port));
 	}
 	if(c->sockdomain == IPv6){
 		if(inet_ntop(AF_INET6, &addrV6.sin6_addr, buf, sizeof(buf)) == nil){
-			setfneterr("inet_ntop failed (%s)", errnostr());
+			setfneterr("inet_ntop failed (%s)", sockerrstr());
 			return -1;
 		}
 		snprintf(c->remote.addr, AddrStrMaxLen, "%s:%d", buf, ntohs(addrV6.sin6_port));
@@ -507,6 +540,7 @@ setremaddr(NetConn *c)
 	return 0;
 }
 
+#ifndef _WIN32
 static
 FILE*
 fdfile(int fd)
@@ -518,6 +552,30 @@ fdfile(int fd)
 	}
 	return f;
 }
+#else
+static
+FILE*
+fdfile(sockt sock)
+{
+	int fd;
+	FILE *f;
+
+	fd = _open_osfhandle((intptr_t)sock, _O_RDWR);
+	if(fd == -1){
+		setfneterr("open_osfhandle failed (%s)", errnostr());
+		return nil;
+	}
+
+	f = _fdopen(fd, "r+");
+	if(f == nil){
+		setfneterr("fdopen failed (%s)", errnostr());
+		_close(fd);
+		return nil;
+	}
+
+	return f;
+}
+#endif
 
 static
 int
@@ -623,6 +681,31 @@ static	thread_local char estr[256];
 char*	fneterr(void)	{return estr;}
 char*	errnostr(void)	{return strerror(errno);}
 
+char*
+sockerrstr(void)
+{
+#ifndef _WIN32
+	return strerror(errno);
+#else
+	int err;
+	static thread_local char msgbuf[256];
+
+	msgbuf[0] = '\0';
+	err = WSAGetLastError();
+	FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+		nil, err, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+		msgbuf, sizeof(msgbuf), nil);
+
+	size_t len = strlen(msgbuf);
+	while(len > 0 && (msgbuf[len - 1] == '\r' || msgbuf[len - 1] == '\n')){
+		msgbuf[--len] = '\0';
+	}
+
+	return msgbuf;
+#endif
+}
+
+
 int
 setfneterr(char *fmt, ...)
 {
@@ -633,5 +716,27 @@ setfneterr(char *fmt, ...)
 		memcpy(estr, emsg, sizeof(emsg));
 	}
 	va_end(args);
+	return 0;
+}
+
+int
+fnetinit(void)
+{
+#ifdef _WIN32
+	WSADATA wsaData;
+	if(WSAStartup(MAKEWORD(2, 2), &wsaData) != 0){
+		setfneterr("WSAStartup failed (%s)", sockerrstr());
+		return -1;
+	}
+#endif
+	return 0;
+}
+
+int
+fnetcleanup(void)
+{
+#ifdef _WIN32
+	return WSACleanup();
+#endif
 	return 0;
 }

@@ -10,3 +10,7 @@ FILE*		fnetf(NetConn*);
 char*		fnetlocaddr(NetConn*);
 char*		fnetremaddr(NetConn*);
 void		fnetclose(NetConn*);
+
+/* needed for windows */
+int		fnetinit(void);
+int		fnetcleanup(void);
