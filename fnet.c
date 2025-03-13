@@ -244,8 +244,7 @@ fnetlocaddr(NetConn *c)
 char*
 fnetremaddr(NetConn *c)
 {
-	if(c->conntype == Listen &&
-	(c->socktype == DgRam || c->remote.addr[0] == '\0'))
+	if(c->conntype == Listen && c->remote.addr[0] == '\0')
 		setremaddr(c);
 	return c->remote.addr;
 }
