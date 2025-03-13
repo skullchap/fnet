@@ -86,17 +86,17 @@ struct NetConn
 	SockType   socktype;
 	ParsedV4V6 v4v6;
 	NetAddr    remote, local;
-	int fd;
+	sockt fd;
 };
 
 static NetConn*	newnetconn(char *proto, char *addr, ConnType ct);
 static int	setsockdomaintype(NetConn *c, char *proto, char *addr);
-static int	sockdial(NetConn *c);
-static int	socklisten(NetConn *c);
-static int	sockaccept(NetConn *c);
+static sockt	sockdial(NetConn *c);
+static sockt	socklisten(NetConn *c);
+static sockt	sockaccept(NetConn *c);
 static int	setlocaddr(NetConn *c);
 static int	setremaddr(NetConn *c);
-static FILE*	fdfile(int fd);
+static FILE*	fdfile(sockt fd);
 static int	parsev4v6(char *addr, ParsedV4V6 *result);
 static int	setfneterr(char *fmt, ...);
 static char*	sockerrstr();
@@ -210,8 +210,8 @@ fnetaccept(NetConn *servc)
 	NetConn *clientc;
 
 	if(servc->socktype == DgRam){
-		setfneterr("fnetaccept should be applied on stream sockets");
-		return nil;
+		setremaddr(servc);
+		return servc;
 	}
 
 	clientc = newnetconn(servc->local.proto, servc->local.addr, Listen);
@@ -257,10 +257,10 @@ typedef struct sockaddr_un 	SockaddrUnix;
 typedef struct sockaddr		Sockaddr;
 
 static
-int
+sockt
 sockdial(NetConn *c)
 {
-	int fd;
+	sockt fd;
 	SockaddrIn addrV4;
 	SockaddrIn6 addrV6;
 	SockaddrUnix addrUnix;
@@ -296,7 +296,8 @@ sockdial(NetConn *c)
 #endif
 	if(c->socktype == DgRam){
 		int b=1;
-		setsockopt(fd, SOL_SOCKET, SO_BROADCAST, &b, sizeof(b));
+		void *p= &b;
+		setsockopt(fd, SOL_SOCKET, SO_BROADCAST, p, sizeof(b));
 	}
 
 	switch(c->sockdomain)
@@ -339,10 +340,10 @@ sockdial(NetConn *c)
 }
 
 static
-int
+sockt
 socklisten(NetConn *c)
 {
-	int fd;
+	sockt fd;
 	SockaddrIn addrV4;
 	SockaddrIn6 addrV6;
 	SockaddrUnix addrUnix;
@@ -424,14 +425,21 @@ socklisten(NetConn *c)
 	return fd;
 }
 
-int
+sockt
 sockaccept(NetConn *c)
 {
-	int cfd = accept(c->fd, nil, nil);
+	sockt cfd = accept(c->fd, nil, nil);
+#ifndef _WIN32
 	if(cfd < 0){
 		setfneterr("accept failed (%s)", sockerrstr());
 		return -1;
 	}
+#else
+	if(cfd == INVALID_SOCKET){
+		setfneterr("accept failed (%s)", sockerrstr());
+		return -1;
+	}
+#endif
 	return cfd;
 }
 
@@ -517,8 +525,17 @@ setremaddr(NetConn *c)
 		}
 	}else{
 		char b[1];
+		SockaddrIn addr;
+		addr.sin_family = AF_UNSPEC;
+		memset(&addr, 0, sizeof(addr));
+		connect(c->fd, (Sockaddr*)&addr, sizeof(addr));
+
 		if(recvfrom(c->fd, b, 1, MSG_PEEK, paddr, &addrlen) < 0){
 			setfneterr("recvfrom failed (%s)", sockerrstr());
+			return -1;
+		}
+		if(connect(c->fd, paddr, addrlen) < 0){
+			setfneterr("connection failed (%s)", errnostr());
 			return -1;
 		}
 	}
@@ -543,7 +560,7 @@ setremaddr(NetConn *c)
 #ifndef _WIN32
 static
 FILE*
-fdfile(int fd)
+fdfile(sockt fd)
 {
 	FILE *f = fdopen(fd, "r+");
 	if(f == nil){
