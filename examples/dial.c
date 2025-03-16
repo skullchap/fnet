@@ -23,12 +23,11 @@ main(int argc, char **argv)
 	printf("Connected (%s -> %s)\n", fnetlocaddr(c), fnetremaddr(c));
 
 	if(fork()){
-		while(fgets(buf, sizeof(buf), stdin) > 0){
+		while(fgets(buf, sizeof(buf), stdin)){
 			fputs(buf, fnetf(c));
-			fflush(fnetf(c));
 		}
 	}else{
-		while(fgets(buf, sizeof(buf), fnetf(c)) > 0){
+		while(fgets(buf, sizeof(buf), fnetf(c))){
 			fputs(buf, stdout);
 		}
 	}

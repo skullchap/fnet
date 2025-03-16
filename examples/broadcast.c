@@ -31,7 +31,6 @@ main(int argc, char **argv)
 
 	do {
 		printf("Enter nickname: ");
-		fflush(stdout);
 		if(fgets(nick, sizeof(nick), stdin)){
 			nick[strcspn(nick, "\n")] = '\0';
 		}
@@ -42,7 +41,6 @@ main(int argc, char **argv)
 	if(fork()){
 		while(1){
 			printf("> %s: ", nick);
-			fflush(stdout);
 
 			if(fgets(msg, sizeof(msg), stdin)){
 				msg[strcspn(msg, "\n")] = '\0';
@@ -54,7 +52,6 @@ main(int argc, char **argv)
 					continue;
 
 				fputs(buf, fnetf(send));
-				fflush(fnetf(send));
 			}
 		}
 	}else{
@@ -67,7 +64,6 @@ main(int argc, char **argv)
 				continue;
 
 			printf("\n< %s\n> %s: ", buf, nick);
-			fflush(stdout);
 		}
 	}
 
