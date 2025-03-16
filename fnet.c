@@ -158,34 +158,17 @@ newnetconn(char *proto, char *addr, ConnType ct)
 	return c;
 }
 
-static
-int
-dialisten(NetConn *c)
-{
-	if(c->conntype == Dial){
-		if((c->fd = sockdial(c)) < 0){
-			return -1;
-		}
-	}else{
-		if((c->fd = socklisten(c)) < 0){
-			return -1;
-		}
-	}
-	if(!(c->f = fdfile(c->fd))){
-		close(c->fd);
-		return -1;
-	}
-	return 0;
-}
-
 NetConn*
 fnetdial(char *proto, char *addr)
 {
 	NetConn *c = newnetconn(proto, addr, Dial);
 	if(!c)
 		return nil;
-	if(dialisten(c) < 0){
-		fnetclose(c);
+	if((c->fd = sockdial(c)) < 0){
+		return nil;
+	}
+	if(!(c->f = fdfile(c->fd))){
+		close(c->fd);
 		return nil;
 	}
 	return c;
@@ -197,8 +180,11 @@ fnetlisten(char *proto, char *addr)
 	NetConn *c = newnetconn(proto, addr, Listen);
 	if(!c)
 		return nil;
-	if(dialisten(c) < 0){
-		fnetclose(c);
+	if((c->fd = socklisten(c)) < 0){
+		return nil;
+	}
+	if(!(c->f = fdfile(c->fd))){
+		close(c->fd);
 		return nil;
 	}
 	return c;
@@ -566,6 +552,7 @@ fdfile(sockt fd)
 		setfneterr("fdopen failed (%s)", errnostr());
 		return nil;
 	}
+	setvbuf(f, nil, _IOLBF, 0);
 	return f;
 }
 #else
@@ -585,10 +572,9 @@ fdfile(sockt sock)
 	f = _fdopen(fd, "r+");
 	if(f == nil){
 		setfneterr("fdopen failed (%s)", errnostr());
-		_close(fd);
 		return nil;
 	}
-
+	setvbuf(f, nil, _IOLBF, 0);
 	return f;
 }
 #endif
@@ -720,7 +706,6 @@ sockerrstr(void)
 	return msgbuf;
 #endif
 }
-
 
 int
 setfneterr(char *fmt, ...)
