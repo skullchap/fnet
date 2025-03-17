@@ -1,7 +1,7 @@
 #!/bin/sh
 
 if [ $# -eq 0 ]; then
-  echo "Provide 'dial', 'listen', 'broadcast'"
+  echo "Provide 'dial', 'listen', 'broadcast', 'get'"
   exit 1
 fi
 
@@ -26,6 +26,13 @@ elif [ "$1" = "broadcast" ]; then
   ../fnet.c \
   broadcast.c -o broadcast
 
+elif [ "$1" = "get" ]; then
+  echo "compiling get"
+  cc \
+  -I ../. \
+  ../fnet.c \
+  get.c -o get
+
 else
-  echo "Allowed args are: dial, listen, broadcast"
+  echo "Allowed args are: dial, listen, broadcast, get"
 fi
